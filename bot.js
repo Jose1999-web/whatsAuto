@@ -1,13 +1,15 @@
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const TelegramBot = require('node-telegram-bot-api');
 const fs = require('fs');
+const http = require('http');
 
 // --- Configuración ---
-const TELEGRAM_TOKEN = '8080763561:AAFo93EyV8gqCdl3gMvRK2i5L_KcN8Y6hVs';
+const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const YOUR_TELEGRAM_USER_ID = 6534104615;
 const WHATSAPP_TELEGRAM_GROUP_ID = -1002519574888;
 const CHAT_MAP_FILE = './chat_topic_map.json';
 const NOTIFY_PERSONAL_CHAT = true;
+const PORT = process.env.PORT || 3000;
 
 // Cliente WhatsApp y Telegram
 const whatsappClient = new Client({
@@ -17,7 +19,7 @@ const whatsappClient = new Client({
 const telegramBot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 
 let chatTopicMapping = {};
-let pendingReplies = {}; // Objeto para guardar las respuestas pendientes
+let pendingReplies = {};
 try {
     chatTopicMapping = JSON.parse(fs.readFileSync(CHAT_MAP_FILE));
 } catch (e) {
@@ -127,7 +129,7 @@ telegramBot.on('callback_query', (callbackQuery) => {
 
     if (data.startsWith('REPLY_')) {
         const waId = data.substring(6);
-        pendingReplies[fromId] = waId; // Guarda el waId en un objeto con el ID del usuario de Telegram
+        pendingReplies[fromId] = waId;
         telegramBot.answerCallbackQuery(callbackQuery.id, { text: "Listo para responder." });
         sendMessageToTelegram(chatId, '📝 Por favor, envía tu respuesta ahora.', { message_thread_id: topicId, reply_to_message_id: messageId });
     }
@@ -169,7 +171,7 @@ telegramBot.on('message', async (msg) => {
         
         if (sent) {
             sendMessageToTelegram(chatId, '✅ Enviado a WhatsApp.', { message_thread_id: topicId });
-            delete pendingReplies[fromId]; // Elimina la respuesta pendiente
+            delete pendingReplies[fromId];
         }
     } catch (err) {
         console.error("Error al enviar respuesta a WhatsApp:", err);
@@ -179,3 +181,13 @@ telegramBot.on('message', async (msg) => {
 });
 
 whatsappClient.initialize();
+
+// --- Servidor para Ping ---
+const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Bot is awake!\n');
+});
+
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Ping server listening on port ${PORT}`);
+});
