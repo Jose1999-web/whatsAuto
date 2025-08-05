@@ -11,33 +11,12 @@ const CHAT_MAP_FILE = './chat_topic_map.json';
 const NOTIFY_PERSONAL_CHAT = true;
 const PORT = process.env.PORT || 3000;
 
-// --- Respuestas rápidas ---
-const quickReplies = {
-    '/hola': '¡Hola! ¿En qué podemos ayudarte?',
-    '/gracias': '¡De nada! Estamos a tu servicio.',
-    '/horario': 'Nuestro horario de atención es de 9:00 a 18:00, de lunes a viernes.',
-    '/catalogo': 'Puedes ver nuestro catálogo de productos en el siguiente enlace: [Aquí está el catálogo]',
-};
-
 // Cliente WhatsApp y Telegram
-const isProduction = process.env.PORT;
 const whatsappClient = new Client({
     authStrategy: new LocalAuth({ dataPath: './auth' }),
-    puppeteer: {
-        headless: true,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--single-process',
-            '--disable-gpu'
-        ]
-    }
+    puppeteer: { headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] }
 });
-const telegramBot = new TelegramBot(TELEGRAM_TOKEN, { polling: !isProduction });
+const telegramBot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 
 let chatTopicMapping = {};
 let pendingReplies = {};
@@ -197,31 +176,6 @@ telegramBot.on('message', async (msg) => {
     } catch (err) {
         console.error("Error al enviar respuesta a WhatsApp:", err);
         sendMessageToTelegram(chatId, '❌ Error al enviar la respuesta.', { message_thread_id: topicId });
-        delete pendingReplies[fromId];
-    }
-});
-
-// --- Manejo de respuestas rápidas ---
-telegramBot.onText(/^\/(\w+)/, async (msg, match) => {
-    const chatId = msg.chat.id;
-    const command = match[0];
-    const fromId = msg.from.id;
-    const topicId = msg.message_thread_id;
-
-    if (chatId !== WHATSAPP_TELEGRAM_GROUP_ID || !quickReplies[command] || !pendingReplies[fromId]) {
-        return;
-    }
-
-    const waId = pendingReplies[fromId];
-    const replyText = quickReplies[command];
-
-    try {
-        await whatsappClient.sendMessage(waId, replyText);
-        sendMessageToTelegram(chatId, `✅ Respuesta rápida enviada a WhatsApp: "${replyText}"`, { message_thread_id: topicId });
-        delete pendingReplies[fromId];
-    } catch (err) {
-        console.error("Error al enviar respuesta rápida a WhatsApp:", err);
-        sendMessageToTelegram(chatId, '❌ Error al enviar la respuesta rápida.', { message_thread_id: topicId });
         delete pendingReplies[fromId];
     }
 });
